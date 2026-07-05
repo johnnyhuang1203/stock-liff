@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>好好選股</title>
+<meta name="theme-color" content="#0f5132" />
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{
+    --up:#e11d2a; --down:#0a8f52; --gold:#c9a227;
+    --ink:#16201b; --sub:#5c6b62; --line:#e3eae5; --bg:#eef3f0; --card:#fff;
+    --brand:#0f5132; --brand2:#0a3d26; --radius:16px; --shadow:0 2px 10px rgba(20,40,30,.07);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);padding-bottom:96px}
+  header{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:14px 16px}
+  .h-title{font-size:19px;font-weight:800}
+  .h-sub{font-size:12px;opacity:.85;margin-top:2px}
+  .h-hi{font-size:12px;opacity:.9;margin-top:4px}
+  .navbar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:8px;align-items:center}
+  select,input,button{font-family:inherit}
+  select.nav{flex:1;font-size:16px;font-weight:700;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--brand)}
+  main{padding:14px}
+  .sec-title{font-weight:800;margin:2px 0 12px;font-size:16px;display:flex;align-items:center;gap:6px}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:14px;cursor:pointer;color:var(--sub)}
+  .chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+  input.txt{padding:11px 12px;border:1px solid var(--line);border-radius:12px;font-size:16px;width:100%}
+  .btn{border:0;border-radius:12px;padding:11px 16px;font-size:15px;font-weight:800;cursor:pointer}
+  .btn-p{background:var(--brand);color:#fff}
+  .btn-buy{background:var(--up);color:#fff}
+  .btn-sell{background:var(--down);color:#fff}
+  .btn-ghost{background:#fff;color:var(--brand);border:1px solid var(--line)}
+  .hit{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px dashed var(--line)}
+  .hit:last-child{border-bottom:0}
+  .hit .nm{font-weight:800}
+  .hit .rs{font-size:12px;color:var(--sub);margin-top:2px}
+  .hit .px{text-align:right;font-weight:800}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:6px}
+  .tag.buy{background:rgba(225,29,42,.12);color:var(--up)} .tag.sell{background:rgba(10,143,82,.12);color:var(--down)}
+  .ind{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .ind:last-child{border-bottom:0}
+  .v-bull{color:var(--up);font-weight:800} .v-bear{color:var(--down);font-weight:800} .v-mid{color:var(--sub);font-weight:700}
+  .muted{color:var(--sub);font-size:13px}
+  .warn{background:#fff5f5;border:1px solid #f3c9c9;color:#a11;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.6}
+  .fab{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 14px;display:flex;gap:10px}
+  .fab .btn{flex:1}
+  .err{color:#a11;font-weight:700;padding:8px 0}
+  .skel{height:14px;background:linear-gradient(90deg,#eee,#f6f6f6,#eee);border-radius:6px;margin:8px 0;animation:sk 1.2s infinite}
+  @keyframes sk{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
+  label.lbl{font-size:13px;color:var(--sub);font-weight:700;display:block;margin:8px 0 4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-title">📈 好好選股</div>
+  <div class="h-sub">技術分析選股 · 個股解讀 · 凱基下單</div>
+  <div class="h-hi" id="hi"></div>
+</header>
+
+<div class="navbar">
+  <select class="nav" id="nav">
+    <option value="scan">🎯 技術分析篩選</option>
+    <option value="stock">🔍 個股分析</option>
+    <option value="inv" class="owner-only" hidden>📦 庫存/績效</option>
+    <option value="trade" class="owner-only" hidden>🟢 下單</option>
+  </select>
+</div>
+
+<main id="main"><div class="card"><div class="skel"></div><div class="skel"></div></div></main>
+
+<div class="fab">
+  <button class="btn btn-ghost" id="btn-refresh">🔄 重新整理</button>
+  <button class="btn btn-p" id="btn-share">↗ 分享</button>
+</div>
+
+<script>
+const CFG = {
+  LIFF_ID: 'PASTE_STOCK_LIFF_ID',
+  API_BASE: 'https://immunize-gonad-viewable.ngrok-free.dev'
+};
+const state = { uid:'', owner:false, trade:false, view:'scan', method:'ma_cross', dual:false, share:{}, methods:[] };
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fmt = n => (n==null?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:2}));
+
+async function api(path, {method='GET', body=null}={}){
+  const opt = { method, headers:{'ngrok-skip-browser-warning':'true'} };
+  if(body){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
+  const r = await fetch(CFG.API_BASE+path, opt);
+  const t = await r.text();
+  let j; try{ j=JSON.parse(t); }catch(e){ throw new Error('伺服器回應非 JSON（bot/ngrok 是否開著？）'); }
+  if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+
+/* ---------- 導覽 ---------- */
+function go(view){
+  state.view = view;
+  $('nav').value = view;
+  if(view==='scan') renderScan();
+  else if(view==='stock') renderStock();
+  else if(view==='inv') renderInv();
+  else if(view==='trade') renderTrade();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- 技術分析篩選 ---------- */
+async function renderScan(){
+  const m = $('main');
+  const methodChips = state.methods.map(x=>
+    `<div class="chip ${x.key===state.method?'active':''}" data-m="${x.key}">${esc(x.label)}</div>`).join('');
+  m.innerHTML = `<div class="sec-title">🎯 技術分析篩選</div>
+    <div class="card">
+      <div class="row">
+        <div class="chip ${!state.dual?'active':''}" id="mode-single">單篩</div>
+        <div class="chip ${state.dual?'active':''}" id="mode-dual">技術+財報雙篩</div>
+      </div>
+      <div class="muted" style="margin-bottom:6px">選一個技術指標：</div>
+      <div class="row" id="mchips">${methodChips}</div>
+      <button class="btn btn-p" id="run" style="width:100%">開始篩選</button>
+    </div>
+    <div id="scan-out"></div>`;
+  $('mode-single').onclick=()=>{state.dual=false;renderScan();};
+  $('mode-dual').onclick=()=>{state.dual=true;renderScan();};
+  m.querySelectorAll('#mchips .chip').forEach(c=>c.onclick=()=>{state.method=c.dataset.m;renderScan();});
+  $('run').onclick=runScan;
+}
+async function runScan(){
+  const out = $('scan-out');
+  out.innerHTML = `<div class="card"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>`;
+  try{
+    const path = state.dual ? `/api/dual?method=${state.method}` : `/api/scan?method=${state.method}`;
+    const d = await api(path);
+    const label = (state.methods.find(x=>x.key===state.method)||{}).label||state.method;
+    const hits = d.hits||[];
+    if(!hits.length){ out.innerHTML=`<div class="card muted">目前無符合「${esc(label)}${state.dual?' + 財報':''}」的標的。</div>`; return; }
+    const rows = hits.map(h=>{
+      const buy = h.signal==='BUY';
+      const fund = h.metrics&&h.metrics['財報分']!=null ? `　財報 ${h.metrics['財報分']}` : '';
+      return `<div class="hit">
+        <div><div class="nm">${esc(h.symbol)} ${esc(h.name)}<span class="tag ${buy?'buy':'sell'}">${buy?'買訊':'賣訊'}</span></div>
+          <div class="rs">${esc(h.reason)}${esc(fund)}</div></div>
+        <div><div class="px">${fmt(h.last)}</div>
+          <div class="row" style="justify-content:flex-end;margin:6px 0 0">
+            <button class="btn btn-ghost" style="padding:6px 10px" data-ana="${esc(h.symbol)}">分析</button>
+            ${state.owner?`<button class="btn btn-buy" style="padding:6px 10px" data-buy="${esc(h.symbol)}">下單</button>`:''}
+          </div></div></div>`;
+    }).join('');
+    out.innerHTML = `<div class="card"><div class="sec-title" style="font-size:14px">符合 ${hits.length} 檔　<span class="muted" style="font-weight:600">${esc(label)}${state.dual?' + 財報品質':''}</span></div>${rows}</div>`;
+    out.querySelectorAll('[data-ana]').forEach(b=>b.onclick=()=>{goStock(b.dataset.ana);});
+    out.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{go('trade');setTimeout(()=>{const c=$('t-code');if(c){c.value=b.dataset.buy;}},50);});
+    state.share.scan = `🎯 ${label}${state.dual?'+財報':''} 選股（${hits.length}檔）\n`+hits.slice(0,12).map(h=>`• ${h.symbol} ${h.name} ${fmt(h.last)} ${h.signal==='BUY'?'買訊':'賣訊'}`).join('\n')+'\n\n— 好好選股';
+  }catch(e){ out.innerHTML=`<div class="card err">篩選失敗：${esc(e.message)}</div>`; }
+}
+
+/* ---------- 個股分析 ---------- */
+function renderStock(){
+  $('main').innerHTML = `<div class="sec-title">🔍 個股分析</div>
+    <div class="card">
+      <label class="lbl">輸入股票代號</label>
+      <div class="row"><input class="txt" id="code-in" inputmode="numeric" placeholder="如 2330" style="flex:1"/>
+        <button class="btn btn-p" id="go-ana">分析</button></div>
+    </div><div id="stock-out"></div>`;
+  $('go-ana').onclick=()=>loadStock($('code-in').value.trim());
+  $('code-in').addEventListener('keydown',e=>{if(e.key==='Enter')loadStock($('code-in').value.trim());});
+}
+function goStock(code){ if(state.view!=='stock'){state.view='stock';$('nav').value='stock';renderStock();} setTimeout(()=>{if($('code-in'))$('code-in').value=code; loadStock(code);},30); }
+async function loadStock(code){
+  if(!code) return;
+  const out=$('stock-out'); out.innerHTML=`<div class="card"><div class="skel"></div><div class="skel"></div></div>`;
+  try{
+    const a = await api(`/api/stock?code=${encodeURIComponent(code)}`);
+    const vcls=v=>v==='看多'?'v-bull':(v==='看空'?'v-bear':'v-mid');
+    const inds=(a.views||[]).map(v=>`<div class="ind"><span>${esc(v.name)}　<span class="muted">${esc(v.detail)}</span></span><span class="${vcls(v.view)}">${esc(v.view)}</span></div>`).join('');
+    out.innerHTML=`<div class="card">
+      <div class="sec-title" style="font-size:17px">${esc(a.symbol)} ${esc(a.name)}　<span style="font-weight:800">${fmt(a.last)}</span>
+        <span class="${a.change_pct>=0?'v-bull':'v-bear'}" style="font-size:13px">${a.change_pct>=0?'▲':'▼'} ${fmt(a.change_pct)}%</span></div>
+      <div style="font-weight:800;margin:2px 0 8px">${esc(a.verdict)}</div>
+      <div class="muted" style="margin-bottom:10px">${esc(a.summary)}</div>
+      ${inds}
+      <div class="muted" style="margin-top:10px">量能 ${fmt(a.vol_ratio)}×20日均量　${a.above_ma60?'站上季線':'跌破季線'}　${a.above_ma240?'站上年線':'跌破年線'}</div>
+      ${state.owner?`<div class="row" style="margin-top:12px"><button class="btn btn-buy" id="s-buy">🔴 買進</button><button class="btn btn-sell" id="s-sell">🟢 賣出</button></div>`:''}
+    </div>`;
+    if(state.owner){ $('s-buy').onclick=()=>{go('trade');setTimeout(()=>{$('t-code').value=a.symbol;$('t-side').value='buy';},50);};
+      $('s-sell').onclick=()=>{go('trade');setTimeout(()=>{$('t-code').value=a.symbol;$('t-side').value='sell';},50);}; }
+    state.share.stock = `🔍 ${a.symbol} ${a.name}　${fmt(a.last)}（${a.change_pct>=0?'+':''}${fmt(a.change_pct)}%）\n${a.verdict}\n`+(a.views||[]).map(v=>`• ${v.name}：${v.view}`).join('\n')+`\n${a.summary}\n\n— 好好選股`;
+  }catch(e){ out.innerHTML=`<div class="card err">${esc(e.message)}</div>`; }
+}
+
+/* ---------- 庫存/績效（本人）---------- */
+async function renderInv(){
+  const m=$('main'); m.innerHTML=`<div class="sec-title">📦 庫存/績效</div><div class="card"><div class="skel"></div><div class="skel"></div></div>`;
+  try{
+    const d = await api(`/api/positions?uid=${encodeURIComponent(state.uid)}`);
+    const pos=d.positions||[];
+    if(!pos.length){ m.innerHTML=`<div class="sec-title">📦 庫存/績效</div><div class="card muted">目前無持倉。</div>`; state.share.inv='📦 目前無持倉\n\n— 好好選股'; return; }
+    let tc=0,tv=0;
+    const rows=pos.map(p=>{ tc+=p.cost; tv+=p.market_value; const up=p.pnl>=0;
+      return `<div class="hit"><div><div class="nm">${esc(p.symbol)} ${esc(p.name)}</div>
+        <div class="rs">${p.qty} 張　成本 ${fmt(p.avg_cost)}　現價 ${fmt(p.last_price)}</div></div>
+        <div class="px"><div class="${up?'v-bull':'v-bear'}">${up?'+':''}${fmt(p.pnl)}</div><div class="rs ${up?'v-bull':'v-bear'}">${up?'+':''}${fmt(p.roi)}%</div></div></div>`;}).join('');
+    const tp=tv-tc, troi=tc?tp/tc*100:0;
+    m.innerHTML=`<div class="sec-title">📦 庫存/績效</div><div class="card">${rows}
+      <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px;font-weight:800">
+        總現值 ${fmt(tv)}　<span class="${tp>=0?'v-bull':'v-bear'}">總損益 ${tp>=0?'+':''}${fmt(tp)}（${tp>=0?'+':''}${fmt(troi)}%）</span></div></div>`;
+    state.share.inv = `📦 庫存/績效\n`+pos.map(p=>`• ${p.symbol} ${p.name} ${p.qty}張 ${p.pnl>=0?'+':''}${fmt(p.pnl)}（${fmt(p.roi)}%）`).join('\n')+`\n總損益 ${tp>=0?'+':''}${fmt(tp)}\n\n— 好好選股`;
+  }catch(e){ m.innerHTML=`<div class="sec-title">📦 庫存/績效</div><div class="card err">${esc(e.message)}</div>`; }
+}
+
+/* ---------- 下單（本人 + 二次確認）---------- */
+function renderTrade(){
+  $('main').innerHTML=`<div class="sec-title">🟢 下單</div>
+    <div class="card">
+      <div class="warn">⚠️ 這是<b>真實凱基下單</b>。送出前會再跳一次確認，確認後才會真的委託。僅限本人。</div>
+      <label class="lbl">股票代號</label><input class="txt" id="t-code" inputmode="numeric" placeholder="如 2330"/>
+      <label class="lbl">買/賣</label>
+      <select class="nav" id="t-side" style="width:100%"><option value="buy">🔴 買進</option><option value="sell">🟢 賣出</option></select>
+      <label class="lbl">單位</label>
+      <select class="nav" id="t-odd" style="width:100%"><option value="0">整股（張）</option><option value="1">零股（股）</option></select>
+      <label class="lbl">數量</label><input class="txt" id="t-qty" inputmode="numeric" value="1"/>
+      <button class="btn btn-p" id="t-preview" style="width:100%;margin-top:14px">下一步（預覽確認）</button>
+      <div id="t-out" style="margin-top:12px"></div>
+    </div>`;
+  $('t-preview').onclick=previewOrder;
+}
+async function previewOrder(){
+  const out=$('t-out');
+  const payload={ uid:state.uid, code:$('t-code').value.trim(), side:$('t-side').value, odd:$('t-odd').value==='1', qty:parseInt($('t-qty').value||'0',10), confirm:false };
+  if(!payload.code||!payload.qty){ out.innerHTML=`<div class="err">請填代號與數量</div>`; return; }
+  out.innerHTML=`<div class="muted">查價中…</div>`;
+  try{
+    const d = await api('/api/order',{method:'POST',body:payload});
+    if(d.confirm_required){
+      const act = payload.side==='buy'?'買進':'賣出';
+      out.innerHTML=`<div class="warn">${esc(d.warning)}<br><br>
+        <b>${act} ${esc(d.code)} ${esc(d.name)}</b><br>
+        數量：${d.qty} ${esc(d.unit)}（${fmt(d.shares)} 股）<br>
+        參考價：${fmt(d.price)}　預估金額：約 ${fmt(d.est_amount)} 元</div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn ${payload.side==='buy'?'btn-buy':'btn-sell'}" id="t-confirm" style="flex:1">✅ 確認送出（真實下單）</button>
+          <button class="btn btn-ghost" id="t-cancel">取消</button></div>`;
+      $('t-cancel').onclick=()=>{out.innerHTML='';};
+      $('t-confirm').onclick=async()=>{
+        out.innerHTML=`<div class="muted">送出中…</div>`;
+        try{ const r=await api('/api/order',{method:'POST',body:Object.assign({},payload,{confirm:true})});
+          out.innerHTML=`<div class="card" style="margin:0"><b>✅ 已送出</b><br><div class="muted" style="white-space:pre-wrap">${esc(r.result)}</div></div>`;
+        }catch(e){ out.innerHTML=`<div class="err">下單失敗：${esc(e.message)}</div>`; }
+      };
+    } else { out.innerHTML=`<div class="err">${esc(d.error||'無法預覽')}</div>`; }
+  }catch(e){ out.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+}
+
+/* ---------- 分享（資訊圖卡）---------- */
+function _wrap(ctx,t,x,y,mw,lh){var l='';for(var i=0;i<t.length;i++){var s=l+t[i];if(ctx.measureText(s).width>mw&&l){ctx.fillText(l,x,y);l=t[i];y+=lh;}else l=s;}if(l)ctx.fillText(l,x,y);return y;}
+async function shareBlob(){
+  var scale=2, Wl=440, pad=18, W=Wl*scale;
+  var FT='system-ui,"PingFang TC","Microsoft JhengHei",sans-serif';
+  var titles={scan:'技術分析篩選',stock:'個股分析',inv:'庫存/績效',trade:'下單'};
+  var sm=(state.share[state.view]||'好好選股').replace(/\r/g,'').trim();
+  var mc=document.createElement('canvas').getContext('2d'); mc.font='400 13.5px '+FT;
+  var lines=[]; sm.split('\n').forEach(function(par){ if(par===''){lines.push('');return;} var c='';for(var i=0;i<par.length;i++){var s=c+par[i];if(mc.measureText(s).width>(Wl-2*pad)&&c){lines.push(c);c=par[i];}else c=s;} if(c)lines.push(c); });
+  var hH=64,fH=64,bpT=16,bpB=10,lh=22; var bH=bpT+lines.length*lh+bpB, tot=hH+bH+fH;
+  var cv=document.createElement('canvas'); cv.width=W; cv.height=Math.round(tot*scale); var ctx=cv.getContext('2d'); ctx.scale(scale,scale);
+  ctx.fillStyle='#eef3f0'; ctx.fillRect(0,0,Wl,tot);
+  var g=ctx.createLinearGradient(0,0,Wl,hH); g.addColorStop(0,'#0f5132'); g.addColorStop(1,'#0a3d26'); ctx.fillStyle=g; ctx.fillRect(0,0,Wl,hH);
+  var d=new Date(),ds=('0'+(d.getMonth()+1)).slice(-2)+'/'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  ctx.fillStyle='#fff'; ctx.textBaseline='alphabetic'; ctx.font='800 19px '+FT; ctx.fillText('📈 好好選股',pad,28);
+  ctx.globalAlpha=.92; ctx.font='400 12px '+FT; ctx.fillText((titles[state.view]||'')+' · '+ds,pad,47); ctx.globalAlpha=1;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,hH,Wl,bH); var yy=hH+bpT+14;
+  lines.forEach(function(ln){ ctx.fillStyle='#16201b'; ctx.font='400 13.5px '+FT; ctx.fillText(ln,pad,yy); yy+=lh; });
+  var fy=hH+bH; ctx.fillStyle='#f3f7f4'; ctx.fillRect(0,fy,Wl,fH);
+  ctx.fillStyle='#5c6b62'; ctx.font='400 11px '+FT; _wrap(ctx,'※ 本內容由好好選股整理，僅供參考，非投資建議，投資前請自行評估風險。',pad,fy+20,Wl-2*pad,15);
+  ctx.fillStyle='#0f5132'; ctx.font='800 12px '+FT; ctx.fillText('→ 好好選股',pad,fy+54);
+  return await new Promise(res=>cv.toBlob(b=>res(b),'image/png',0.95));
+}
+async function doShare(){
+  try{
+    var blob=await shareBlob(); var file=new File([blob],'好好選股.png',{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'好好選股',text:'好好選股 · 僅供參考，非投資建議'}); return; }
+    var url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download='好好選股.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+    alert('已存成圖片，可到相簿分享');
+  }catch(e){ alert('分享失敗：'+e.message); }
+}
+
+/* ---------- 啟動 ---------- */
+async function boot(){
+  $('nav').onchange=e=>go(e.target.value);
+  $('btn-refresh').onclick=()=>go(state.view);
+  $('btn-share').onclick=doShare;
+  try{ state.methods = await api('/api/methods'); if(state.methods[0]) state.method=state.methods[0].key; }catch(e){}
+  go('scan');
+  try{
+    if(CFG.LIFF_ID && CFG.LIFF_ID!=='PASTE_STOCK_LIFF_ID'){
+      await liff.init({liffId:CFG.LIFF_ID});
+      if(liff.isLoggedIn()){
+        const p=await liff.getProfile(); state.uid=p.userId;
+        $('hi').textContent = p.displayName?('Hi, '+p.displayName):'';
+        try{ const w=await api('/api/whoami?uid='+encodeURIComponent(state.uid)); state.owner=!!w.owner; state.trade=!!w.trade_enabled; }catch(e){}
+        if(state.owner){ document.querySelectorAll('.owner-only').forEach(o=>o.hidden=false); }
+      }
+    }
+  }catch(e){ /* 一般瀏覽器預覽：非本人，下單/庫存隱藏 */ }
+}
+document.addEventListener('DOMContentLoaded',boot);
+</script>
+</body>
+</html>
