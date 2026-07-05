@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <title>好好選股</title>
 <meta name="theme-color" content="#0f5132" />
+<meta name="description" content="技術分析選股・個股解讀・凱基下單（限本人）" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./stk-icon-192.png" />
+<link rel="apple-touch-icon" href="./stk-apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="好好選股" />
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}</script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   :root{
@@ -60,6 +69,7 @@
   <div class="h-title">📈 好好選股</div>
   <div class="h-sub">技術分析選股 · 個股解讀 · 凱基下單</div>
   <div class="h-hi" id="hi"></div>
+  <button id="login-btn" style="display:none;margin-top:8px;background:#fff;color:#0f5132;border:0;border-radius:10px;padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer">🔑 用 LINE 登入（啟用下單／庫存）</button>
 </header>
 
 <div class="navbar">
@@ -294,17 +304,22 @@ async function boot(){
   $('btn-share').onclick=doShare;
   try{ state.methods = await api('/api/methods'); if(state.methods[0]) state.method=state.methods[0].key; }catch(e){}
   go('scan');
+  var lb=$('login-btn');
+  if(lb) lb.onclick=function(){ try{ liff.login({redirectUri:location.href}); }catch(e){ alert('請在 LINE 或支援的瀏覽器開啟以登入'); } };
   try{
     if(CFG.LIFF_ID && CFG.LIFF_ID!=='PASTE_STOCK_LIFF_ID'){
       await liff.init({liffId:CFG.LIFF_ID});
       if(liff.isLoggedIn()){
         const p=await liff.getProfile(); state.uid=p.userId;
         $('hi').textContent = p.displayName?('Hi, '+p.displayName):'';
+        if(lb) lb.style.display='none';
         try{ const w=await api('/api/whoami?uid='+encodeURIComponent(state.uid)); state.owner=!!w.owner; state.trade=!!w.trade_enabled; }catch(e){}
         if(state.owner){ document.querySelectorAll('.owner-only').forEach(o=>o.hidden=false); }
+      } else if(!liff.isInClient()){
+        if(lb) lb.style.display='inline-block';
       }
     }
-  }catch(e){ /* 一般瀏覽器預覽：非本人，下單/庫存隱藏 */ }
+  }catch(e){ if(lb) lb.style.display='inline-block'; }
 }
 document.addEventListener('DOMContentLoaded',boot);
 </script>
